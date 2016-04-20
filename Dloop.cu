@@ -1,7 +1,6 @@
 #include<stdio.h>
 #include<math.h>
 
-
 int rowSize;
 
 __global__ void printGpu(float *d_a, int size)
@@ -25,8 +24,9 @@ __global__ void Dloop_FW(float *d_a,int k, int rowSize)
 	__shared__ int intermed;
         if (threadIdx.x == 0) {
                	intermed = d_a[rowSize*blockIdx.y + k];
+	}
         __syncthreads();
-       	}
+
 
         d_a[blockIdx.y*rowSize + col]  = fmin(d_a[blockIdx.y*rowSize + col], intermed + d_a[k*rowSize+col]);
 
@@ -50,7 +50,7 @@ int main(int argc, char** argv)
 	float *a;
 	
 	size_t pitch;
-	rowSize = 1024;
+	rowSize = 8192;
 	int colSize = rowSize;
 	int i,j,k;
 	cudaError_t err = cudaSuccess;  
@@ -101,8 +101,8 @@ int main(int argc, char** argv)
     	}   
 	
 
-	int threadsPerBlock = 256;
-	dim3 blocksPerGrid( (rowSize + threadsPerBlock -1)/threadsPerBlock ,rowSize);
+	int threadsPerBlock = 1024;
+	dim3 blocksPerGrid( (colSize + threadsPerBlock - 1)/threadsPerBlock ,rowSize);
 
 	for(k=0;k<rowSize;k++)
 	{
@@ -121,16 +121,9 @@ int main(int argc, char** argv)
     	}   
 
 	puts("output matrix :");	
-	
-	for(i = 1048575 ; i >= 1048500;i--)
-		printf("%0.1f\n" , a[i]);
+	print_matrix(a,rowSize);
 
 	free(a);
 	cudaFree(d_a);
 	return 0;
-	
-
-
-	
-
 }

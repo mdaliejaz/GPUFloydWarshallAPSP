@@ -27,8 +27,8 @@ __global__ void Bloop_FW(float *d_a,int i,int k, int colSize)
 		intermed = d_a[i*colSize+k];
 		//d_a[i*colSize + threadIdx.x ]  = ((intermed + d_a[k*colSize + threadIdx.x]) < d_a[i*colSize + threadIdx.x ]) ? (intermed + d_a[k*colSize + threadIdx.x]) : (d_a[i*colSize + threadIdx.x ]);
 		//d_a[i*colSize + col ]  = fmin(intermed + d_a[k*colSize + col] ,  d_a[i*colSize+col ]); 	
-	__syncthreads();
 	}
+	__syncthreads();
 
 	d_a[i*colSize +	col ]  = fmin(intermed + d_a[k*colSize + col], d_a[i*colSize+col ]);
 	//d_a[i*colSize + threadIdx.x ]  = ((intermed + d_a[k*colSize + threadIdx.x]) < d_a[i*colSize + threadIdx.x ]) ? (intermed + d_a[k*colSize + threadIdx.x]) : (d_a[i*colSize + threadIdx.x ]);
@@ -54,7 +54,7 @@ int main(int argc, char** argv)
 	float *a;
 	
 	size_t pitch;
-	rowSize = 2048;
+	rowSize = 8192;
 	int colSize = rowSize;
 	int i,j,k;
 	cudaError_t err = cudaSuccess;  
@@ -69,14 +69,14 @@ int main(int argc, char** argv)
 	
 	err = cudaMallocPitch(&d_a, &pitch, rowSize * sizeof(float), colSize);
 	if(!d_a)
-		{
-			printf("memory failed for cudaMalloc");
-			return 1;
-		}  
+	{
+		printf("memory failed for cudaMalloc");
+		return 1;
+	}  
   	
 	if(err !=0){
         	printf("%s-%d",cudaGetErrorString(err),3);
-        	//getchar();  
+   		return 1;  
     	}   
 
 	for(i = 0; i < rowSize;i++)
@@ -108,7 +108,7 @@ int main(int argc, char** argv)
 	{
 	   for(i = 0; i < rowSize;i++)
 	   {
-                	Bloop_FW<<<64,32>>>(d_a,i,k,rowSize);
+                	Bloop_FW<<<rowSize/1024,1024>>>(d_a,i,k,rowSize);
 			cudaThreadSynchronize();
 		
 	   }
@@ -120,7 +120,7 @@ int main(int argc, char** argv)
 
 	if(err !=0){
         	printf("final %s-%d",cudaGetErrorString(err),3);
-        //	getchar();  
+        	return 1; 
     	}   
 
 	puts("output matrix :");	
