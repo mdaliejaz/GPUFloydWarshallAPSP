@@ -99,16 +99,23 @@ int main(int argc, char** argv)
         	printf("after h2d %s-%d",cudaGetErrorString(err),3);
         getchar();  
     	}   
-	
 
-	int threadsPerBlock = 1024;
+	int threadsPerBlock;
+ 
+        if (rowSize < 1024)
+        {   
+                threadsPerBlock = rowSize;
+        }
+        else
+        {
+                threadsPerBlock = 1024;
+        }
 	dim3 blocksPerGrid( (colSize + threadsPerBlock - 1)/threadsPerBlock ,rowSize);
 
 	for(k=0;k<rowSize;k++)
 	{
                 	Dloop_FW<<<blocksPerGrid,threadsPerBlock>>>(d_a,k,rowSize);
-			cudaThreadSynchronize();
-		
+			cudaThreadSynchronize();	
 	}
 
 	printf("error = %s\n", cudaGetErrorString(cudaGetLastError()));

@@ -101,14 +101,26 @@ int main(int argc, char** argv)
         getchar();  
     	}   
 	
+	int threadsPerBlock;
+ 	int noOfBlocks;
+ 
+ 	if (rowSize < 1024)
+        { 
+		threadsPerBlock	= rowSize;
+	}
+	else
+ 	{
+ 		threadsPerBlock = 1024;
+ 	}
+ 
+        noOfBlocks = rowSize / threadsPerBlock;
 
 	for(k=0;k<rowSize;k++)
 	{
 	   for(j = 0; j < colSize; j++)
 	   {
-                	Cloop_FW<<<rowSize/1024, 1024>>>(d_a,j,k,rowSize);
-			cudaThreadSynchronize();
-		
+                	Cloop_FW<<<noOfBlocks,threadsPerBlock>>>(d_a,j,k,rowSize);
+			cudaThreadSynchronize();		
 	   }
 	}
 
