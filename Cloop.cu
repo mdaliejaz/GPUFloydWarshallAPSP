@@ -17,15 +17,18 @@ __global__ void printGpu(float *d_a, int size)
 
 __global__ void Cloop_FW(float *d_a,int j,int k, int rowSize)
 {
-
 	__shared__ int intermed;
-	if (threadIdx.x == k) {
-		intermed = d_a[k*rowSize+j];
-		d_a[threadIdx.x*rowSize + j ]  = fmin( d_a[threadIdx.x*rowSize + j ], d_a[threadIdx.x*rowSize + k] + intermed); 	
-	__syncthreads();
-	}
+	int col =  blockIdx.x * blockDim.x + threadIdx.x;
+	if(col >= rowSize)
+		return;
 
-        d_a[threadIdx.x*rowSize + j ]  = fmin( d_a[threadIdx.x*rowSize + j ], d_a[threadIdx.x*rowSize + k] + intermed);
+	if (threadIdx.x == 0) {
+		intermed = d_a[k*rowSize+j];
+		//d_a[threadIdx.x*rowSize + j ]  = fmin( d_a[threadIdx.x*rowSize + j ], d_a[threadIdx.x*rowSize + k] + intermed); 	
+	}
+	__syncthreads();
+
+        d_a[col*rowSize + j ]  = fmin( d_a[col*rowSize + j ], d_a[col*rowSize + k] + intermed);
 
 
 }
@@ -48,7 +51,7 @@ int main(int argc, char** argv)
 	float *a;
 	
 	size_t pitch;
-	rowSize = 8;
+	rowSize = 8192;
 	int colSize = rowSize;
 	int i,j,k;
 	cudaError_t err = cudaSuccess;  
@@ -103,7 +106,7 @@ int main(int argc, char** argv)
 	{
 	   for(j = 0; j < colSize; j++)
 	   {
-                	Cloop_FW<<<1,rowSize>>>(d_a,j,k,rowSize);
+                	Cloop_FW<<<rowSize/1024, 1024>>>(d_a,j,k,rowSize);
 			cudaThreadSynchronize();
 		
 	   }
@@ -124,9 +127,5 @@ int main(int argc, char** argv)
 	free(a);
 	cudaFree(d_a);
 	return 0;
-	
-
-
-	
-
 }
+
