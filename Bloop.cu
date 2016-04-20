@@ -19,13 +19,19 @@ __global__ void Bloop_FW(float *d_a,int i,int k, int colSize)
 {
 
 	__shared__ int intermed;
-	if (threadIdx.x == k) {
+	int col =  blockIdx.x * blockDim.x + threadIdx.x;
+	if(col >= colSize)
+		return;
+
+	if (threadIdx.x == 0) {
 		intermed = d_a[i*colSize+k];
-		d_a[i*colSize + threadIdx.x ]  = fmin(intermed + d_a[k*colSize + threadIdx.x] ,  d_a[i*colSize+threadIdx.x ]); 	
+		//d_a[i*colSize + threadIdx.x ]  = ((intermed + d_a[k*colSize + threadIdx.x]) < d_a[i*colSize + threadIdx.x ]) ? (intermed + d_a[k*colSize + threadIdx.x]) : (d_a[i*colSize + threadIdx.x ]);
+		//d_a[i*colSize + col ]  = fmin(intermed + d_a[k*colSize + col] ,  d_a[i*colSize+col ]); 	
 	__syncthreads();
 	}
 
-	d_a[i*colSize +	threadIdx.x ]  = fmin(intermed + d_a[k*colSize + threadIdx.x], d_a[i*colSize+threadIdx.x ]);
+	d_a[i*colSize +	col ]  = fmin(intermed + d_a[k*colSize + col], d_a[i*colSize+col ]);
+	//d_a[i*colSize + threadIdx.x ]  = ((intermed + d_a[k*colSize + threadIdx.x]) < d_a[i*colSize + threadIdx.x ]) ? (intermed + d_a[k*colSize + threadIdx.x]) : (d_a[i*colSize + threadIdx.x ]);
 
 
 }
@@ -48,7 +54,7 @@ int main(int argc, char** argv)
 	float *a;
 	
 	size_t pitch;
-	rowSize = 64;
+	rowSize = 2048;
 	int colSize = rowSize;
 	int i,j,k;
 	cudaError_t err = cudaSuccess;  
@@ -102,7 +108,7 @@ int main(int argc, char** argv)
 	{
 	   for(i = 0; i < rowSize;i++)
 	   {
-                	Bloop_FW<<<2,colSize/2>>>(d_a,i,k,rowSize);
+                	Bloop_FW<<<64,32>>>(d_a,i,k,rowSize);
 			cudaThreadSynchronize();
 		
 	   }
@@ -123,9 +129,4 @@ int main(int argc, char** argv)
 	free(a);
 	cudaFree(d_a);
 	return 0;
-	
-
-
-	
-
 }
