@@ -1,11 +1,12 @@
 #include<stdio.h>
 #include<math.h>
+#include <sys/time.h>
 
 int rowSize;
 
 __global__ void printGpu(float *d_a, int size)
 {
-	   int i,j;
+	int i,j;
         for(i=0;i<size;i++)
         {
                 for(j=0;j<size;j++)
@@ -16,7 +17,6 @@ __global__ void printGpu(float *d_a, int size)
 
 __global__ void Dloop_FW(float *d_a,int k, int rowSize)
 {
-
 	int col = blockIdx.x * blockDim.x + threadIdx.x;
 	if (col >= rowSize)
 		return;
@@ -27,9 +27,7 @@ __global__ void Dloop_FW(float *d_a,int k, int rowSize)
 	}
         __syncthreads();
 
-
         d_a[blockIdx.y*rowSize + col]  = fmin(d_a[blockIdx.y*rowSize + col], intermed + d_a[k*rowSize+col]);
-
 }
 
 void print_matrix(float *d,int size)
@@ -45,12 +43,10 @@ void print_matrix(float *d,int size)
 
 int main(int argc, char** argv) 
 {
-
 	float *d_a;
-	float *a;
-	
+	float *a;	
 	size_t pitch;
-	rowSize = 8192;
+	rowSize = atoi(argv[1]);
 	int colSize = rowSize;
 	int i,j,k;
 	cudaError_t err = cudaSuccess;  
@@ -65,16 +61,15 @@ int main(int argc, char** argv)
 	
 	err = cudaMallocPitch(&d_a, &pitch, rowSize * sizeof(float), colSize);
 	if(!d_a)
-		{
-			printf("memory failed for cudaMalloc");
-			return 1;
-		}  
+	{
+		printf("memory failed for cudaMalloc");
+		return 1;
+	}  
   	
 	if(err !=0){
         	printf("%s-%d",cudaGetErrorString(err),3);
-        	//getchar();  
+        	return 1;  
     	}   
-
 
 	for(i = 0; i < rowSize;i++)
 		for (j=0;j<colSize;j++)
@@ -90,45 +85,42 @@ int main(int argc, char** argv)
  
 
 	//puts("input matrix :");
-
 	//print_matrix(a,rowSize);
 	
 	err = cudaMemcpy(d_a, a, totalSize, cudaMemcpyHostToDevice);
-
-	if(err !=0){
+	if(err !=0) {
         	printf("after h2d %s-%d",cudaGetErrorString(err),3);
-        getchar();  
+        	return 1;
     	}   
 
 	int threadsPerBlock;
- 
-        if (rowSize < 1024)
-        {   
+        if (rowSize < 1024) {   
                 threadsPerBlock = rowSize;
-        }
-        else
-        {
+        } else {
                 threadsPerBlock = 1024;
         }
 	dim3 blocksPerGrid( (colSize + threadsPerBlock - 1)/threadsPerBlock ,rowSize);
+	
+	struct timeval  tv1, tv2;
+	gettimeofday(&tv1, NULL);
 
-	for(k=0;k<rowSize;k++)
-	{
-                	Dloop_FW<<<blocksPerGrid,threadsPerBlock>>>(d_a,k,rowSize);
-			cudaThreadSynchronize();	
+	for(k=0;k<rowSize;k++) {
+               	Dloop_FW<<<blocksPerGrid,threadsPerBlock>>>(d_a,k,rowSize);
+		cudaThreadSynchronize();	
 	}
+	gettimeofday(&tv2, NULL);
+	printf ("Total Execution time = %f seconds\n", (double)(tv2.tv_usec - tv1.tv_usec) / 1000000 + (double)(tv2.tv_sec - tv1.tv_sec));
 
 	printf("error = %s\n", cudaGetErrorString(cudaGetLastError()));
 
        	err = cudaMemcpy(a, d_a, totalSize, cudaMemcpyDeviceToHost);
-
 	if(err !=0){
         	printf("final %s-%d",cudaGetErrorString(err),3);
-        //	getchar();  
+        	return 1;  
     	}   
 
-	puts("output matrix :");	
-	print_matrix(a,rowSize);
+	//puts("output matrix :");	
+	//print_matrix(a,rowSize);
 
 	free(a);
 	cudaFree(d_a);
