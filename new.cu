@@ -24,41 +24,26 @@ void print_matrix(float *d)
 	}
 }
 
-__global__ void Dloop_FW(float *d_a, int k, int xRowStart, int xColStart, int uRowStart, int uColStart, int vRowStart, int vColStart, int currSize, int rowSize)
+__global__ void Dloop_FW(float *d_a, int xRowStart, int xColStart, int uRowStart, int uColStart, int vRowStart, int vColStart, int currSize, int rowSize)
 {
 	int j = blockIdx.x * blockDim.x + threadIdx.x + xColStart;
-	//if (j >= rowSize)
-	//	return;
+	if (j >= rowSize)
+		return;
 	//int i = xRowStart + rowSize*blockIdx.y;
 	int i = blockIdx.y * blockDim.y + threadIdx.y + xRowStart;
-	//if (i >= rowSize)
-          //      return;
+	if (i >= rowSize)
+        	return;
 
-	//__shared__ 
-	int intermed;
-	//for(int k = vRowStart; k < (vRowStart + currSize); k++) {
-		//if (threadIdx.x == 0) {
-		       	intermed = d_a[i + k];
-	       	//}
+	__shared__ int intermed;
+	for(int k = vRowStart; k < (vRowStart + currSize); k++) {
+		if (threadIdx.x == 0) {
+		       	intermed = d_a[i*rowSize + k];
+	       	}
 
-	       // __syncthreads();
+	        __syncthreads();
 		if(i != j && j != k && i != k)
-			d_a[i + j]  = fmin(d_a[i + j], intermed + d_a[k*rowSize+j]);
-		//__syncthreads();
-	//}
-	
-	/*for(int k = vRowStart; k < (vRowStart + currSize); k++)
-        {
-                for(int i = xRowStart; i < (xRowStart + currSize); i++)
-                {
-                        for(int j = xColStart; j < (xColStart + currSize); j++)
-                        {
-                                if(i != j && j != k && i != k)
-                                        d_a[i*rowSize+j] = fmin( d_a[i*rowSize+k] + d_a[k*rowSize+j] ,d_a[i*rowSize+j]);
-                }
-            }
-        }*/
-
+			d_a[i*rowSize + j]  = fmin(d_a[i*rowSize + j], intermed + d_a[k*rowSize+j]);
+	}	
 }
 
 void FW_D_loop(float *d_a, int xRowStart, int xColStart, int uRowStart, int uColStart, int vRowStart, int vColStart, int currSize, int rowSize)
@@ -72,13 +57,8 @@ void FW_D_loop(float *d_a, int xRowStart, int xColStart, int uRowStart, int uCol
 
 	dim3 blocksPerGrid( currSize /threadsPerBlock ,currSize);
 
-	for(int k = vRowStart; k < (vRowStart + currSize); k++)
-	{
-		        //Dloop_FW<<<1,1>>>(d_a, xRowStart, xColStart, uRowStart, uColStart, vRowStart, vColStart, currSize, rowSize);
-			Dloop_FW<<<blocksPerGrid,threadsPerBlock>>>(d_a, k, xRowStart, xColStart, uRowStart, uColStart, vRowStart, vColStart, currSize, rowSize);
-			//cudaThreadSynchronize();
-
-	}
+	Dloop_FW<<<blocksPerGrid,threadsPerBlock>>>(d_a, xRowStart, xColStart, uRowStart, uColStart, vRowStart, vColStart, currSize, rowSize);
+	//cudaThreadSynchronize();
 }
 
 void DFW(float *d_a, int xRowStart, int xColStart, int uRowStart, int uColStart, int vRowStart, int vColStart, int currSize, int d, int rowSize)
@@ -93,7 +73,6 @@ void DFW(float *d_a, int xRowStart, int xColStart, int uRowStart, int uColStart,
 			for(int i=1; i<=r; i++) {
 				for(int j=1; j<=r; j++) {
 					DFW(d_a, xRowStart + (i-1)*newsize, xColStart + (j-1)*newsize, uRowStart + (i-1)*newsize, uColStart + (k-1)*newsize, vRowStart + (k-1)*newsize, vColStart + (j-1)*newsize, newsize, d+1, rowSize);
-					//DFW((i-1)*newsize, (j-1)*newsize, (i-1)*newsize, (k-1)*newsize, (k-1)*newsize, (j-1)*newsize, newsize, d+1);
 				}
 			}
 			cudaThreadSynchronize();	
@@ -120,19 +99,6 @@ __global__ void Cloop_FW(float *d_a, int xRowStart, int xColStart, int uRowStart
 				d_a[i*rowSize + j ]  = fmin( d_a[i*rowSize + j ], d_a[i*rowSize + k] + intermed);
 	   	}	
 	}
-
-/*	for(int k = vRowStart; k < (vRowStart + currSize); k++)
-        {
-                for(int i = xRowStart; i < (xRowStart + currSize); i++)
-                {
-                        for(int j = xColStart; j < (xColStart + currSize); j++)
-                        {
-                                if(i != j && j != k && i != k)
-                                        d_a[i*rowSize+j] = fmin( d_a[i*rowSize+k] + d_a[k*rowSize+j] ,d_a[i*rowSize+j]);
-                }
-            }
-        }
-*/
 }
 
 void FW_C_loop(float* d_a, int xRowStart, int xColStart, int uRowStart, int uColStart, int vRowStart, int vColStart, int currSize, int rowSize)
@@ -145,16 +111,9 @@ void FW_C_loop(float* d_a, int xRowStart, int xColStart, int uRowStart, int uCol
                 threadsPerBlock = 1024;
 
         int noOfBlocks = currSize / threadsPerBlock;
-	// for(int k = vRowStart; k < (vRowStart + currSize); k++)
-        //{
-          //      for(int j = xColStart; j < (xColStart + currSize); j++)
-            //    {
-	
-	//Cloop_FW<<<1,1>>>(d_a, xRowStart, xColStart, uRowStart, uColStart, vRowStart, vColStart, currSize, rowSize);
 	Cloop_FW<<<noOfBlocks,threadsPerBlock>>>(d_a, xRowStart, xColStart, uRowStart, uColStart, vRowStart, vColStart, currSize, rowSize);
 
 	//cudaThreadSynchronize();
-//	} }*
 }
 
 void CFW(float* d_a, int xRowStart, int xColStart, int uRowStart, int uColStart, int vRowStart, int vColStart, int currSize, int d, int rowSize)
@@ -168,7 +127,6 @@ void CFW(float* d_a, int xRowStart, int xColStart, int uRowStart, int uColStart,
 		for(int k=1; k<=r; k++) {	
 			for(int i=1; i<=r; i++) {
 				CFW(d_a, xRowStart + (i-1)*newsize, xColStart + (k-1)*newsize, uRowStart + (i-1)*newsize, uColStart + (k-1)*newsize, vRowStart + (k-1)*newsize, vColStart + (k-1)*newsize, newsize, d+1, rowSize);
-				//CFW((i-1)*newsize, (k-1)*newsize, (i-1)*newsize, (k-1)*newsize, (k-1)*newsize, (k-1)*newsize, newsize, d+1);
 			}
 			cudaThreadSynchronize();
 
@@ -176,7 +134,6 @@ void CFW(float* d_a, int xRowStart, int xColStart, int uRowStart, int uColStart,
 				for(int j=1; j<=r; j++) {
 					if(j != k)
 						DFW(d_a, xRowStart + (i-1)*newsize, xColStart + (j-1)*newsize, uRowStart + (i-1)*newsize, uColStart + (k-1)*newsize, vRowStart + (k-1)*newsize, vColStart + (j-1)*newsize, newsize, d+1, rowSize);
-						//DFW((i-1)*newsize, (j-1)*newsize, (i-1)*newsize, (k-1)*newsize, (k-1)*newsize, (j-1)*newsize, newsize, d+1);
 				}
 			}
 			cudaThreadSynchronize();	
@@ -203,19 +160,6 @@ __global__ void Bloop_FW(float *d_a, int xRowStart, int xColStart, int uRowStart
 				d_a[i*rowSize +	j ]  = fmin(intermed + d_a[k*rowSize + j], d_a[i*rowSize+j]);
 		}
 	}
-
-/*	for(int k = vRowStart; k < (vRowStart + currSize); k++)
-        {
-                for(int i = xRowStart; i < (xRowStart + currSize); i++)
-                {
-                        for(int j = xColStart; j < (xColStart + currSize); j++)
-                        {
-                                if(i != j && j != k && i != k)
-                                        d_a[i*rowSize+j] = fmin( d_a[i*rowSize+k] + d_a[k*rowSize+j] ,d_a[i*rowSize+j]);
-                }
-            }
-        }
-*/	
 }
 
 void FW_B_loop(float* d_a, int xRowStart, int xColStart, int uRowStart, int uColStart, int vRowStart, int vColStart, int currSize, int rowSize)
@@ -231,15 +175,9 @@ void FW_B_loop(float* d_a, int xRowStart, int xColStart, int uRowStart, int uCol
 	}
 
 	int noOfBlocks = currSize / threadsPerBlock;
-	//for(int k = vRowStart; k < (vRowStart + currSize); k++)
-        //{
-          //      for(int i = xRowStart; i < (xRowStart + currSize); i++)
-            //    {
 	
-	//Bloop_FW<<<1,1>>>(d_a, xRowStart, xColStart, uRowStart, uColStart, vRowStart, vColStart, currSize, rowSize);
 	Bloop_FW<<<noOfBlocks,threadsPerBlock>>>(d_a, xRowStart, xColStart, uRowStart, uColStart, vRowStart, vColStart, currSize, rowSize);
 	//cudaThreadSynchronize();
-	//} }
 }
 
 void BFW(float* d_a, int xRowStart, int xColStart, int uRowStart, int uColStart, int vRowStart, int vColStart, int currSize, int d, int rowSize)
@@ -253,7 +191,6 @@ void BFW(float* d_a, int xRowStart, int xColStart, int uRowStart, int uColStart,
 		for(int k=1; k<=r; k++) {
 			for(int j=1; j<=r; j++) {
 				BFW(d_a, xRowStart + (k-1)*newsize, xColStart + (j-1)*newsize, uRowStart + (k-1)*newsize, uColStart + (k-1)*newsize, vRowStart + (k-1)*newsize, vColStart + (j-1)*newsize, newsize, d+1, rowSize);
-					//BFW((k-1)*newsize, (j-1)*newsize, (k-1)*newsize, (k-1)*newsize, (k-1)*newsize, (j-1)*newsize, newsize, d+1);
 			}
 			cudaThreadSynchronize();
 
@@ -261,7 +198,6 @@ void BFW(float* d_a, int xRowStart, int xColStart, int uRowStart, int uColStart,
 				for(int j=1; j<=r; j++) {
 					if(i != k)
 						DFW(d_a, xRowStart + (i-1)*newsize, xColStart + (j-1)*newsize, uRowStart + (i-1)*newsize, uColStart + (k-1)*newsize, vRowStart + (k-1)*newsize, vColStart + (j-1)*newsize, newsize, d+1, rowSize);
-						//DFW((i-1)*newsize, (j-1)*newsize, (i-1)*newsize, (k-1)*newsize, (k-1)*newsize, (j-1)*newsize, newsize, d+1);
 				}
 			}
 			cudaThreadSynchronize();
@@ -271,7 +207,6 @@ void BFW(float* d_a, int xRowStart, int xColStart, int uRowStart, int uColStart,
 
 __global__ void Aloop_FW(float *d_a, int xRowStart, int xColStart, int uRowStart, int uColStart, int vRowStart, int vColStart, int currSize, int rowSize)
 {
-
 	/*int col =  blockIdx.x * blockDim.x + threadIdx.x;
 	if(col >= rowSize)
 		return;
@@ -287,21 +222,11 @@ __global__ void Aloop_FW(float *d_a, int xRowStart, int xColStart, int uRowStart
 		}
 	    }
 	}
-
 }
 
 void FW_A_loop(float* d_a, int xRowStart, int xColStart, int uRowStart, int uColStart, int vRowStart, int vColStart, int currSize, int rowSize)
 {        
-	/* for(int k = vRowStart; k < (vRowStart + currSize); k++)
-        {
-                for(int i = xRowStart; i < (xRowStart + currSize); i++)
-                {
-                        for(int j = xColStart; j < (xColStart + currSize); j++)
-                        {*/
-
 	Aloop_FW<<<1,1>>>(d_a, xRowStart, xColStart, uRowStart, uColStart, vRowStart, vColStart, currSize, rowSize);
-//} } }
-
 }
 
 void AFW(float* d_a, int xRowStart, int xColStart, int uRowStart, int uColStart, int vRowStart, int vColStart, int currSize, int d, int rowSize)
@@ -319,13 +244,11 @@ void AFW(float* d_a, int xRowStart, int xColStart, int uRowStart, int uColStart,
 			for(int j=1; j<=r; j++) {
 				if(j != k)
 					BFW(d_a, xRowStart + (k-1)*newsize, xColStart + (j-1)*newsize, uRowStart + (k-1)*newsize, uColStart + (k-1)*newsize, vRowStart + (k-1)*newsize, vColStart + (j-1)*newsize, newsize, d+1, rowSize);
-					//BFW((k-1)*newsize, (j-1)*newsize, (k-1)*newsize, (k-1)*newsize, (k-1)*newsize, (j-1)*newsize, newsize, d+1);
 			}
 			
 			for(int i=1; i<=r; i++) {
 				if(i != k)
 					CFW(d_a, xRowStart + (i-1)*newsize, xColStart + (k-1)*newsize, uRowStart + (i-1)*newsize, uColStart + (k-1)*newsize, vRowStart + (k-1)*newsize, vColStart + (k-1)*newsize, newsize, d+1, rowSize);
-					//CFW((i-1)*newsize, (k-1)*newsize, (i-1)*newsize, (k-1)*newsize, (k-1)*newsize, (k-1)*newsize, newsize, d+1);
 			}
 			cudaThreadSynchronize();
 			
@@ -333,7 +256,6 @@ void AFW(float* d_a, int xRowStart, int xColStart, int uRowStart, int uColStart,
 				for(int j=1; j<=r; j++) {
 					if(i != k && j != k)
 						DFW(d_a, xRowStart + (i-1)*newsize, xColStart + (j-1)*newsize, uRowStart + (i-1)*newsize, uColStart + (k-1)*newsize, vRowStart + (k-1)*newsize, vColStart + (j-1)*newsize, newsize, d+1, rowSize);
-						//DFW((i-1)*newsize, (j-1)*newsize, (i-1)*newsize, (k-1)*newsize, (k-1)*newsize, (j-1)*newsize, newsize, d+1);
 				}
 			}
 			cudaThreadSynchronize();	
@@ -344,9 +266,6 @@ void AFW(float* d_a, int xRowStart, int xColStart, int uRowStart, int uColStart,
 
 int main(int argc, char *argv[])
 {
-	//vertices = atoi(argv[1]);
-	//m = vertices;
-	
 	float *d_a;
 	float *a;
 	size_t pitch;
