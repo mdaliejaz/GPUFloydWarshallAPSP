@@ -213,28 +213,32 @@ void BFW(float* d_a, int xRowStart, int xColStart, int uRowStart, int uColStart,
 }
 
 
-__global__ void Aloop_FW(float *d_a,int i,int j,int k, int rowSize)
+__global__ void Aloop_FW(float *d_a,int rowSize)
 {
-	d_a[i*rowSize+j] = fmin( d_a[i*rowSize+k] + d_a[k*rowSize+j] ,d_a[i*rowSize+j]);
+
+	int col =  blockIdx.x * blockDim.x + threadIdx.x;
+	if(col >= rowSize)
+		return;
+
+	for(int k=0;k<rowSize;k++)
+        {
+           for(int i = 0; i < rowSize;i++)
+           {
+                for (int j=0;j< rowSize;j++)
+                {
+
+		d_a[i*rowSize+j] = fmin( d_a[i*rowSize+k] + d_a[k*rowSize+j] ,d_a[i*rowSize+j]);
+		}
+	    }
+	}
+
 }
 
 void FW_A_loop(float* d_a, int xRowStart, int xColStart, int uRowStart, int uColStart, int vRowStart, int vColStart, int size)
 {
 
-	for(int k = vRowStart; k < (vRowStart + size); k++)
-	{
-		for(int i = xRowStart; i < (xRowStart + size); i++)
-		{
-			for(int j = xColStart; j < (xColStart + size); j++)
-			{
-				Aloop_FW<<<1,1>>>(d_a,i,j,k,rowSize);
-				cudaThreadSynchronize();
-
-			}
-		}
-	}
-
-
+		Aloop_FW<<<1,1>>>(d_a,rowSize);
+//		cudaThreadSynchronize();
 }
 
 
