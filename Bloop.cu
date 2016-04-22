@@ -133,8 +133,8 @@ int main(int argc, char** argv)
         	return 1; 
     	}   
 
-	puts("output matrix :");	
-	print_matrix(a,rowSize);
+	//puts("output matrix :");	
+	//print_matrix(a,rowSize);
 
 	free(a);
 	cudaFree(d_a);

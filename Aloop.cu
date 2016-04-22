@@ -16,11 +16,23 @@ __global__ void printGpu(float *d_a, int size)
         }
 }
 
-__global__ void Aloop_FW(float *d_a,int i,int j,int k, int rowSize)
+__global__ void Aloop_FW(float *d_a, int rowSize)
 {
 	int col =  blockIdx.x * blockDim.x + threadIdx.x;
-	if(col < rowSize)
-		d_a[i*8+j] = fmin( d_a[i*8+k] + d_a[k*8+j] ,d_a[i*8+j]);
+	if(col >= rowSize)
+		return;
+
+	for(int k=0;k<rowSize;k++)
+        {
+           for(int i = 0; i < rowSize;i++)
+           {
+                for (int j=0;j< rowSize;j++)
+                {
+
+		d_a[i*rowSize+j] = fmin( d_a[i*rowSize+k] + d_a[k*rowSize+j] ,d_a[i*rowSize+j]);
+		}
+	    }
+	}
 }
 
 void print_matrix(float *d,int size)
@@ -41,7 +53,7 @@ int main(int argc, char** argv)
 	size_t pitch;
 	rowSize = atoi(argv[1]);
 	int colSize = rowSize;
-	int i,j,k;
+	int i,j;
 	cudaError_t err = cudaSuccess;  
 	size_t totalSize = rowSize*colSize*sizeof(float);	
 
@@ -87,7 +99,7 @@ int main(int argc, char** argv)
         struct timeval  tv1, tv2;
         gettimeofday(&tv1, NULL);
 
-	for(k=0;k<rowSize;k++)
+	/*for(k=0;k<rowSize;k++)
 	{
 	   for(i = 0; i < rowSize;i++)
 	   {
@@ -96,7 +108,8 @@ int main(int argc, char** argv)
 			Aloop_FW<<<1,1>>>(d_a,i,j,k, rowSize);
 		}
 	   }
-	}
+	}*/
+	Aloop_FW<<<1,1>>>(d_a, rowSize);
 
 	gettimeofday(&tv2, NULL);
         printf ("Total Execution time = %f seconds\n", (double)(tv2.tv_usec - tv1.tv_usec) / 1000000 + (double)(tv2.tv_sec - tv1.tv_sec));                                                                   
@@ -111,7 +124,7 @@ int main(int argc, char** argv)
     	}   
 
 	//puts("output matrix :");	
-	//print_matrix(a,rowSize);
+	print_matrix(a,rowSize);
 
 	free(a);
 	cudaFree(d_a);

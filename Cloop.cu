@@ -15,19 +15,25 @@ __global__ void printGpu(float *d_a, int size)
         }
 }
 
-__global__ void Cloop_FW(float *d_a,int j,int k, int rowSize)
+__global__ void Cloop_FW(float *d_a, int rowSize)
 {
 	__shared__ int intermed;
 	int col =  blockIdx.x * blockDim.x + threadIdx.x;
 	if(col >= rowSize)
 		return;
+	
+	for(int k=0;k<rowSize;k++)
+        {
+           for(int j = 0; j < rowSize; j++)
+           {
+		if (threadIdx.x == 0) {
+			intermed = d_a[k*rowSize+j];
+		}
+		__syncthreads();
 
-	if (threadIdx.x == 0) {
-		intermed = d_a[k*rowSize+j];
+        	d_a[col*rowSize + j ]  = fmin( d_a[col*rowSize + j ], d_a[col*rowSize + k] + intermed);
+	   }
 	}
-	__syncthreads();
-
-        d_a[col*rowSize + j ]  = fmin( d_a[col*rowSize + j ], d_a[col*rowSize + k] + intermed);
 }
 
 void print_matrix(float *d,int size)
@@ -48,7 +54,7 @@ int main(int argc, char** argv)
 	size_t pitch;
 	rowSize = atoi(argv[1]);
 	int colSize = rowSize;
-	int i,j,k;
+	int i,j;
 	cudaError_t err = cudaSuccess;  
 	size_t totalSize = rowSize*colSize*sizeof(float);	
 
@@ -108,14 +114,17 @@ int main(int argc, char** argv)
 	struct timeval  tv1, tv2;
 	gettimeofday(&tv1, NULL);
 
-	for(k=0;k<rowSize;k++)
+	/*for(k=0;k<rowSize;k++)
 	{
 	   for(j = 0; j < colSize; j++)
 	   {
-                	Cloop_FW<<<noOfBlocks,threadsPerBlock>>>(d_a,j,k,rowSize);
+                	Cloop_FW<<<noOfBlocks,threadsPerBlock>>>(d_a,j, k, rowSize);
 			cudaThreadSynchronize();		
 	   }
-	}
+	}*/
+
+	Cloop_FW<<<noOfBlocks,threadsPerBlock>>>(d_a, rowSize);
+        cudaThreadSynchronize();
 
 	gettimeofday(&tv2, NULL);
 	printf ("Total Execution time = %f seconds\n", (double)(tv2.tv_usec - tv1.tv_usec) / 1000000 + (double)(tv2.tv_sec - tv1.tv_sec));
@@ -129,7 +138,7 @@ int main(int argc, char** argv)
     	}   
 
 	//puts("output matrix :");	
-	//print_matrix(a,rowSize);
+	print_matrix(a,rowSize);
 
 	free(a);
 	cudaFree(d_a);
