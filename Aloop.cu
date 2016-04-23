@@ -110,10 +110,10 @@ int main(int argc, char** argv)
 	   }
 	}*/
 	Aloop_FW<<<1,1>>>(d_a, rowSize);
-
+	cudaThreadSynchronize();
 	gettimeofday(&tv2, NULL);
         printf ("Total Execution time = %f seconds\n", (double)(tv2.tv_usec - tv1.tv_usec) / 1000000 + (double)(tv2.tv_sec - tv1.tv_sec));                                                                   
-
+	// (double)(tv2.tv_usec - tv1.tv_usec) / 1000000 
 	printf("error = %s\n", cudaGetErrorString(cudaGetLastError()));
 	//puts("in GPU,d_a = :");
 	//printGpu<<<1,1>>>(d_a, rowSize);
@@ -124,7 +124,7 @@ int main(int argc, char** argv)
     	}   
 
 	//puts("output matrix :");	
-	print_matrix(a,rowSize);
+	//print_matrix(a,rowSize);
 
 	free(a);
 	cudaFree(d_a);
