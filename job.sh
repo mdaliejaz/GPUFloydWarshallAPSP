@@ -7,27 +7,8 @@
 
 export CILK_NWORKERS=32
 
-rm Test*
+./FW_Aloop 512 > FW_Aloop_512
+./FW_Bloop 512 > FW_Bloop_512
+./FW_Cloop 512 > FW_Cloop_512
+./FW_Dloop 512 > FW_Dloop_512
 
-./FW_Aloop 16 > 16_output
-./FW_Aloop 32 > 32_output
-./FW_Aloop 64 > 64_output
-./FW_Aloop 128 > 128_output
-./FW_Aloop 256 > 256_output
-./FW_Aloop 512 > 512_output
-./FW_Aloop 1024 > 1024_output
-./FW_Aloop 2048 > 2048_output
-
-./FW_Aloop 4096 > 4096_output
-./FW_Aloop 8192 > 8192_output
-./FW_Aloop 16384 > 16384_output
-#./aloop 32768 > 32768_output
-#./bloop 16384 > test16384b_output
-#./aloop 8192 > test8192a_output
-#./aloop 16384 > test16384a_output
-
-
-
-#./FW_Bloop $1 > fw_bloop_output
-#./FW_Cloop $1 > fw_cloop_output
-#./FW_Dloop $1 > fw_dloop_output

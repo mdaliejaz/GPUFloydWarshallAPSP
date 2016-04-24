@@ -1,24 +1,31 @@
 CC=cilk++
 CFLAGS=-O3 
 #-I $(HOME)/cilk/include/cilk++
-all:	FW_aloop FW_bloop FW_cloop FW_dloop Aloop Bloop Cloop Dloop Cloop2
-FW_aloop:
+
+all:	FW_Aloop FW_Bloop FW_Cloop FW_Dloop aloop bloop cloop dloop rec2 rec3 rec4
+
+FW_Aloop:
 	$(CC) $(CFLAGS) -o FW_Aloop FW_Aloop.cilk -lcilkutil
-FW_bloop:
+FW_Bloop:
 	$(CC) $(CFLAGS) -o FW_Bloop FW_Bloop.cilk -lcilkutil
-FW_cloop:
+FW_Cloop:
 	$(CC) $(CFLAGS) -o FW_Cloop FW_Cloop.cilk -lcilkutil
-FW_dloop:
+FW_Dloop:
 	$(CC) $(CFLAGS) -o FW_Dloop FW_Dloop.cilk -lcilkutil
-Aloop:
+aloop:
 	nvcc -arch=compute_35 -code=sm_35 Aloop.cu -o aloop
-Dloop:
-	nvcc -arch=compute_35 -code=sm_35 Dloop.cu -o dloop
-Bloop:
+bloop:
 	nvcc -arch=compute_35 -code=sm_35 Bloop.cu -o bloop
-Cloop:
+cloop:
 	nvcc -arch=compute_35 -code=sm_35 Cloop.cu -o cloop
-Cloop2:
-	nvcc -arch=compute_35 -code=sm_35 Cloop2.cu -o cloop2
+dloop:
+	nvcc -arch=compute_35 -code=sm_35 Dloop.cu -o dloop
+rec2:
+	nvcc -arch=compute_35 -code=sm_35 rec2.cu -o rec2
+rec3:
+	nvcc -arch=compute_35 -code=sm_35 rec3.cu -o rec3  
+rec4:
+	nvcc -arch=compute_35 -code=sm_35 rec4.cu -o rec4  
+
 clean:
-	rm -rf FW_Aloop FW_Bloop FW_Cloop FW_Dloop aloop bloop dloop cloop cloop2 core*
+	rm FW_Aloop FW_Bloop FW_Cloop FW_Dloop aloop bloop cloop dloop rec2 rec3 rec4
