@@ -8,11 +8,11 @@
 using namespace std;
 
 #define INF     INT_MAX-1
-#define NS	4096
+#define NS	1024
 
 int m;
 int rowSize;
-int tilesize[3] = {2, 4, INT_MAX};
+int tilesize[3] = {4, 2, INT_MAX};
 
 void print_matrix(float *d)
 {
@@ -30,36 +30,32 @@ __global__ void Dloop_FW(float *d_a, int xRowStart, int xColStart, int uRowStart
 	int j = blockIdx.x * blockDim.x + threadIdx.x + xColStart;
 	if (j >= rowSize)
 		return;
-	//int i = xRowStart + rowSize*blockIdx.y;
 	int i = blockIdx.y * blockDim.y + threadIdx.y + xRowStart;
 	if (i >= rowSize)
         	return;
-        
+	int k;
         if(currSize <= NS) {
-		printf("Dloop - Inside Shared Mem\n");
 		__shared__ float local_a[NS];
 
-		local_a[i*rowSize + j] = d_a[i*rowSize + j];
-		for(int k = vRowStart; k < (vRowStart + currSize); k++) {
-			//local_a[i*rowSize + j] = d_a[i*rowSize + j];
+		for(k = vRowStart; k < (vRowStart + currSize); k++) {
+			local_a[i*rowSize + j] = d_a[i*rowSize + j];
 			local_a[i*rowSize + k] = d_a[i*rowSize + k];
 			local_a[k*rowSize + j] = d_a[k*rowSize + j];
 		}
 		__syncthreads();
 		
-		for(int k = vRowStart; k < (vRowStart + currSize); k++) {
+		for(k = vRowStart; k < (vRowStart + currSize); k++) {
 			if(i != j && j != k && i != k)
 				local_a[i*rowSize + j]  = fmin(local_a[i*rowSize + j], local_a[i*rowSize + k] + local_a[k*rowSize + j]);
 		}
 		
 		__syncthreads();
-		//for(int k = vRowStart; k < (vRowStart + currSize); k++) {
+		//for(k = vRowStart; k < (vRowStart + currSize); k++) {
 			d_a[i*rowSize + j] = local_a[i*rowSize + j];
 		//}		
 	} else {
-		 printf("Dloop - Inside Global Mem\n");
 		__shared__ int intermed;
-		for(int k = vRowStart; k < (vRowStart + currSize); k++) {
+		for(k = vRowStart; k < (vRowStart + currSize); k++) {
 			if (threadIdx.x == 0) {
 			       	intermed = d_a[i*rowSize + k];
 		       	}
@@ -84,7 +80,7 @@ void FW_D_loop(float *d_a, int xRowStart, int xColStart, int uRowStart, int uCol
 	dim3 blocksPerGrid( currSize /threadsPerBlock ,currSize);
 
 	Dloop_FW<<<blocksPerGrid,threadsPerBlock>>>(d_a, xRowStart, xColStart, uRowStart, uColStart, vRowStart, vColStart, currSize, rowSize);
-	//cudaThreadSynchronize();
+	cudaThreadSynchronize();
 }
 
 void DFW(float *d_a, int xRowStart, int xColStart, int uRowStart, int uColStart, int vRowStart, int vColStart, int currSize, int d, int rowSize)
@@ -111,13 +107,12 @@ __global__ void Cloop_FW(float *d_a, int xRowStart, int xColStart, int uRowStart
 	int i =  blockIdx.x * blockDim.x + threadIdx.x + xRowStart;
 	if(i >= rowSize)
 		return;
-		
+	int j, k;	
 	if(currSize <= NS) {
-		printf("Cloop - Inside Shared Mem\n");
 		__shared__ float local_a[NS];
 
-		for(int k = vRowStart; k < (vRowStart + currSize); k++) {
-			for(int j = xColStart; j < (xColStart + currSize); j++) {
+		for(k = vRowStart; k < (vRowStart + currSize); k++) {
+			for(j = xColStart; j < (xColStart + currSize); j++) {
 				local_a[i*rowSize + j] = d_a[i*rowSize + j];
 				local_a[i*rowSize + k] = d_a[i*rowSize + k];
 				local_a[k*rowSize + j] = d_a[k*rowSize + j];
@@ -125,9 +120,9 @@ __global__ void Cloop_FW(float *d_a, int xRowStart, int xColStart, int uRowStart
 		}
 		__syncthreads();
 		
-		for(int k = vRowStart; k < (vRowStart + currSize); k++)
+		for(k = vRowStart; k < (vRowStart + currSize); k++)
 		{
-			for(int j = xColStart; j < (xColStart + currSize); j++) 
+			for(j = xColStart; j < (xColStart + currSize); j++) 
 			{
 				if(i != j && j != k && i != k)
 					local_a[i*rowSize + j]  = fmin(local_a[i*rowSize + j], local_a[i*rowSize + k] + local_a[k*rowSize + j]);
@@ -136,15 +131,14 @@ __global__ void Cloop_FW(float *d_a, int xRowStart, int xColStart, int uRowStart
 		
 		__syncthreads();
 		//for(int k = vRowStart; k < (vRowStart + currSize); k++) {
-			for(int j = xColStart; j < (xColStart + currSize); j++) {
+			for(j = xColStart; j < (xColStart + currSize); j++) {
 				d_a[i*rowSize + j] = local_a[i*rowSize + j];
 			}
 		//}
 	} else 
 	{
-		printf("Cloop - Inside Global Mem\n");
 		__shared__ int intermed;
-		for(int k = vRowStart; k < (vRowStart + currSize); k++)
+		for(k = vRowStart; k < (vRowStart + currSize); k++)
 		{
 			for(int j = xColStart; j < (xColStart + currSize); j++) 
 			{
@@ -160,7 +154,7 @@ __global__ void Cloop_FW(float *d_a, int xRowStart, int xColStart, int uRowStart
 }
 
 void FW_C_loop(float* d_a, int xRowStart, int xColStart, int uRowStart, int uColStart, int vRowStart, int vColStart, int currSize, int rowSize)
-{        
+{
 	int threadsPerBlock;
 
         if (currSize <= 1024)
@@ -171,7 +165,7 @@ void FW_C_loop(float* d_a, int xRowStart, int xColStart, int uRowStart, int uCol
         int noOfBlocks = currSize / threadsPerBlock;
 	Cloop_FW<<<noOfBlocks,threadsPerBlock>>>(d_a, xRowStart, xColStart, uRowStart, uColStart, vRowStart, vColStart, currSize, rowSize);
 
-	//cudaThreadSynchronize();
+	cudaThreadSynchronize();
 }
 
 void CFW(float* d_a, int xRowStart, int xColStart, int uRowStart, int uColStart, int vRowStart, int vColStart, int currSize, int d, int rowSize)
@@ -204,13 +198,12 @@ __global__ void Bloop_FW(float *d_a, int xRowStart, int xColStart, int uRowStart
 	int j =  blockIdx.x * blockDim.x + threadIdx.x + xColStart;
 	if(j >= rowSize)
 		return;
-	
+	int k, i;
 	if(currSize <= NS) {
-		printf("Bloop - Inside Shared Mem\n");
 		__shared__ float local_a[NS];
 
-		for(int k = vRowStart; k < (vRowStart + currSize); k++) {
-			for(int i = xRowStart; i < (xRowStart + currSize); i++) {
+		for(k = vRowStart; k < (vRowStart + currSize); k++) {
+			for(i = xRowStart; i < (xRowStart + currSize); i++) {
 				local_a[i*rowSize + j] = d_a[i*rowSize + j];
 				local_a[i*rowSize + k] = d_a[i*rowSize + k];
 				local_a[k*rowSize + j] = d_a[k*rowSize + j];
@@ -218,9 +211,9 @@ __global__ void Bloop_FW(float *d_a, int xRowStart, int xColStart, int uRowStart
 		}
 		__syncthreads();
 		
-		for(int k = vRowStart; k < (vRowStart + currSize); k++)
+		for(k = vRowStart; k < (vRowStart + currSize); k++)
 		{
-			for(int i = xRowStart; i < (xRowStart + currSize); i++)
+			for(i = xRowStart; i < (xRowStart + currSize); i++)
 			{
 				if(i != j && j != k && i != k)
 					local_a[i*rowSize + j]  = fmin(local_a[i*rowSize + j], local_a[i*rowSize + k] + local_a[k*rowSize + j]);
@@ -228,18 +221,17 @@ __global__ void Bloop_FW(float *d_a, int xRowStart, int xColStart, int uRowStart
 		}
 		
 		__syncthreads();
-		//for(int k = vRowStart; k < (vRowStart + currSize); k++) {
-			for(int i = xRowStart; i < (xRowStart + currSize); i++) {
+		//for(k = vRowStart; k < (vRowStart + currSize); k++) {
+			for(i = xRowStart; i < (xRowStart + currSize); i++) {
 				d_a[i*rowSize + j] = local_a[i*rowSize + j];
 			}
 		//}
 	} else 
 	{
-		printf("Cloop - Inside Global Mem\n");
 		__shared__ int intermed;	
-		for(int k = vRowStart; k < (vRowStart + currSize); k++)
+		for(k = vRowStart; k < (vRowStart + currSize); k++)
 		{
-			for(int i = xRowStart; i < (xRowStart + currSize); i++)
+			for(i = xRowStart; i < (xRowStart + currSize); i++)
 			{
 				if (threadIdx.x == 0) {
 					intermed = d_a[i*rowSize+k];
@@ -253,7 +245,7 @@ __global__ void Bloop_FW(float *d_a, int xRowStart, int xColStart, int uRowStart
 }
 
 void FW_B_loop(float* d_a, int xRowStart, int xColStart, int uRowStart, int uColStart, int vRowStart, int vColStart, int currSize, int rowSize)
-{        
+{
 	int threadsPerBlock;
 	if (currSize < 1024)
         { 
@@ -267,7 +259,7 @@ void FW_B_loop(float* d_a, int xRowStart, int xColStart, int uRowStart, int uCol
 	int noOfBlocks = currSize / threadsPerBlock;
 	
 	Bloop_FW<<<noOfBlocks,threadsPerBlock>>>(d_a, xRowStart, xColStart, uRowStart, uColStart, vRowStart, vColStart, currSize, rowSize);
-	//cudaThreadSynchronize();
+	cudaThreadSynchronize();
 }
 
 void BFW(float* d_a, int xRowStart, int xColStart, int uRowStart, int uColStart, int vRowStart, int vColStart, int currSize, int d, int rowSize)
@@ -303,15 +295,14 @@ __global__ void Aloop_FW(float *d_a, int xRowStart, int xColStart, int uRowStart
 	*/
 	
 	if(currSize <= NS) {
-		printf("Aloop - Inside Shared Mem\n");
-		__shared__ float local_a[NS];
+		__shared__ float local_x[NS];
 
 		for(int k = vRowStart; k < (vRowStart + currSize); k++) {
 			for(int i = xRowStart; i < (xRowStart + currSize); i++) {
 				for(int j = xColStart; j < (xColStart + currSize); j++) {
-					local_a[i*rowSize + j] = d_a[i*rowSize + j];
-					local_a[i*rowSize + k] = d_a[i*rowSize + k];
-					local_a[k*rowSize + j] = d_a[k*rowSize + j];
+					local_x[i*rowSize + j] = d_a[i*rowSize + j];
+					local_x[i*rowSize + k] = d_a[i*rowSize + k];
+					local_x[k*rowSize + j] = d_a[k*rowSize + j];
 				}
 			}
 		}
@@ -324,7 +315,7 @@ __global__ void Aloop_FW(float *d_a, int xRowStart, int xColStart, int uRowStart
 				for(int j = xColStart; j < (xColStart + currSize); j++) 
 				{
 					if(i != j && j != k && i != k)
-						local_a[i*rowSize + j]  = fmin(local_a[i*rowSize + j], local_a[i*rowSize + k] + local_a[k*rowSize + j]);
+						local_x[i*rowSize + j]  = fmin(local_x[i*rowSize + j], local_x[i*rowSize + k] + local_x[k*rowSize + j]);
 				}
 			}
 		}
@@ -333,13 +324,12 @@ __global__ void Aloop_FW(float *d_a, int xRowStart, int xColStart, int uRowStart
 		//for(int k = vRowStart; k < (vRowStart + currSize); k++) {
 			for(int i = xRowStart; i < (xRowStart + currSize); i++) {
 				for(int j = xColStart; j < (xColStart + currSize); j++) {
-					d_a[i*rowSize + j] = local_a[i*rowSize + j];
+					d_a[i*rowSize + j] = local_x[i*rowSize + j];
 				}
 			}
 		//}
 	} else 
 	{
-		printf("Aloop - Inside Global Mem\n");
 		for(int k = vRowStart; k < (vRowStart + currSize); k++)
 		{
 			for(int i = xRowStart; i < (xRowStart + currSize); i++)
@@ -355,8 +345,9 @@ __global__ void Aloop_FW(float *d_a, int xRowStart, int xColStart, int uRowStart
 }
 
 void FW_A_loop(float* d_a, int xRowStart, int xColStart, int uRowStart, int uColStart, int vRowStart, int vColStart, int currSize, int rowSize)
-{        
+{
 	Aloop_FW<<<1,1>>>(d_a, xRowStart, xColStart, uRowStart, uColStart, vRowStart, vColStart, currSize, rowSize);
+	cudaThreadSynchronize();
 }
 
 void AFW(float* d_a, int xRowStart, int xColStart, int uRowStart, int uColStart, int vRowStart, int vColStart, int currSize, int d, int rowSize)

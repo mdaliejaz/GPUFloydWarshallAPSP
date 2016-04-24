@@ -1,0 +1,93 @@
+#include<stdio.h>
+#include<iostream>
+#include<limits.h>
+#include<algorithm>
+#include<cilk.h>
+#include<cilkview.h>
+using namespace std;
+
+/* maxVertices represents maximum number of vertices that can be present in the graph. */
+#ifndef maxVertices
+#define maxVertices   16384
+#endif
+#define INF           INT_MAX-1
+
+int dist[maxVertices][maxVertices];
+int vertices;
+//int m;
+
+void print_matrix()
+{
+	for(int i = 0 ; i < vertices; i++ ) 
+	{
+		cout << "\n";
+		for(int j = 0 ; j< vertices ;j++ )
+			cout << dist[i][j] << " " ;
+	}
+}
+
+void init(int n)
+{
+	for(int i=0;i<n;i++)
+	{
+		for(int j=0;j<n;j++)
+		{
+			if(i==j)
+			{
+				dist[i][j] = 0;
+			}
+			else
+			{
+				dist[i][j] = INF;
+			}
+		}
+	}
+}
+
+void FW_C_loop(int vertices)
+{        
+	for(int via=0;via<vertices;via++)
+	{
+		cilk_for(int from=0;from<vertices;from++)
+		{
+			for(int to=0;to<vertices;to++)
+			{
+				if(from!=to && from!=via && to!=via)
+				{
+					dist[from][to] = min(dist[from][to],dist[from][via]+dist[via][to]);
+				}
+
+			}
+		}
+	}
+}
+
+int cilk_main(int argc, char *argv[])
+{      
+	vertices=atoi(argv[1]);
+	//m = atoi(argv[2]);
+	/*initialize dist between all pairs as infinity*/
+	init(vertices);
+
+	for(int i = 0 ; i < vertices ; i++ )
+        {
+                for(int j = 0 ; j< vertices; j++ )
+                {
+                        if( i == j )
+                                dist[i][j] = 0;
+                        else {
+                                dist[i][j] = ((i+j)%5)?(i+j):(i+j)%7;
+                        }
+                }
+        }
+
+	cilk::cilkview cv;
+	cv.start();
+	FW_C_loop(vertices);
+	cv.stop();
+	cv.dump("FW_C_loop", false);
+	cout << endl << cv.accumulated_milliseconds() << " milliseconds" << endl;
+
+	//print_matrix();
+	return 0;
+}
